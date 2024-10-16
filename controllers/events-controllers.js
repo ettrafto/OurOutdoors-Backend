@@ -124,37 +124,54 @@ const updateEvent = async (req, res, next) => {
   res.status(200).json({ event: event.toObject({ getters: true }) });
 };
 
-// Delete an event and update user relations
 const deleteEvent = async (req, res, next) => {
   const eventId = req.params.eventId;
 
   let event;
   try {
     event = await Event.findById(eventId).populate('userId');
+    if (!event) {
+      console.error('Event not found');
+      const error = new HttpError('Could not find event for this id.', 404);
+      return next(error);
+    }
   } catch (err) {
+    console.error('Error finding event:', err);
     const error = new HttpError('Something went wrong, could not delete event.', 500);
     return next(error);
   }
 
-  if (!event) {
-    const error = new HttpError('Could not find event for this id.', 404);
-    return next(error);
-  }
-
   try {
+    console.log('Trying to start transaction to remove event...');
     const sess = await mongoose.startSession();
     sess.startTransaction();
-    await event.remove({ session: sess });
-    event.userId.events.pull(event);
-    await event.userId.save({ session: sess });
+
+    console.log('Attempting to delete event...');
+    await Event.deleteOne({ _id: eventId }, { session: sess });  // Use deleteOne with session
+
+    if (event.userId && event.userId.events) {
+      console.log('Removing event from user\'s events array...');
+      event.userId.events.pull(event);  // Remove the event from the user's events
+      await event.userId.save({ session: sess });  // Save the user within the session
+    } else {
+      console.error('User or user events not found');
+      throw new Error('User or user events not found.');
+    }
+
+    console.log('Committing transaction...');
     await sess.commitTransaction();
+
+    console.log('Event successfully deleted.');
   } catch (err) {
+    console.error('Error during event deletion process:', err);
     const error = new HttpError('Something went wrong, could not delete event.', 500);
     return next(error);
   }
 
   res.status(200).json({ message: 'Deleted event.' });
 };
+
+
 
 const joinEvent = async (req, res, next) => {
   const eventId = req.params.eventId;

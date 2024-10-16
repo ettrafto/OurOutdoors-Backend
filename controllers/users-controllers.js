@@ -120,6 +120,7 @@ const editUser = async (req, res, next) => {
       return next(error);
   }
 
+
   // Update the user fields if provided in the request body
   user.name = name || user.name;
   user.email = email || user.email;
@@ -136,8 +137,31 @@ const editUser = async (req, res, next) => {
 
   res.status(200).json({ user: user.toObject({ getters: true }) });
 };
+
+// Get all events of a user
+const getUserEvents = async (req, res, next) => {
+  const userId = req.params.userId;
+
+  let userWithEvents;
+  try {
+    // Fetch the user and populate the 'events' array
+    userWithEvents = await User.findById(userId).populate('events');
+  } catch (err) {
+    const error = new HttpError('Fetching user events failed, please try again later.', 500);
+    return next(error);
+  }
+
+  if (!userWithEvents || userWithEvents.events.length === 0) {
+    return next(new HttpError('Could not find events for the provided user id.', 404));
+  }
+
+  res.json({ events: userWithEvents.events.map(event => event.toObject({ getters: true })) });
+};
+
+
 exports.editUser = editUser;
 exports.getUserById = getUserById;
 exports.getUsers = getUsers;
 exports.signup = signup;
 exports.login = login;
+exports.getUserEvents = getUserEvents;

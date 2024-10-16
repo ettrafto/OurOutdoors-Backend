@@ -1,4 +1,6 @@
 const express = require('express');
+const cors = require('cors');
+
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 
@@ -8,6 +10,8 @@ const sportsRoutes = require('./routes/sports-routes');
 const HttpError = require('./models/http-error');
 
 const app = express();
+
+app.use(cors());
 
 app.use(bodyParser.json());
 
@@ -30,9 +34,10 @@ app.use((error, req, res, next) => {
 });
 
 //returns promise
-mongoose.connect('mongodb+srv://ettrafto:mypassword@cluster0.juykqy2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
+mongoose.connect('mongodb+srv://ettrafto:pleasehelp@cluster0.juykqy2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
 .then(() => {
   app.listen(5000);
+  console.log("connected")
 })
 .catch(err => {
   console.log(err)

@@ -57,6 +57,6 @@ router.patch('/:eventId/leave', eventsControllers.leaveEvent);
 router.get('/:eventId/comments', eventsControllers.getComments);
 
 // Like an event
-router.post('/:eventId/like', eventsControllers.toggleLikeEvent);
+router.patch('/:eventId/like', eventsControllers.toggleLikeEvent);
 
 module.exports = router;
