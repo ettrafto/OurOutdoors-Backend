@@ -8,7 +8,7 @@ const User = require('../models/user');
 const getUsers = async (req, res, next) => {
   let users;
   try {
-    users = await User.find({}, '-password');
+    users = await User.find({});
   } catch (err) {
     const error = new HttpError('Fetching users failed, please try again later.', 500);
     return next(error);
@@ -22,7 +22,7 @@ const getUserById = async (req, res, next) => {
 
   let user;
   try {
-      user = await User.findById(userId, '-password'); // Exclude password for security
+      user = await User.findById(userId); // Exclude password for security
   } catch (err) {
       const error = new HttpError('Fetching user failed, please try again later.', 500);
       return next(error);
@@ -39,43 +39,46 @@ const getUserById = async (req, res, next) => {
 
 // User signup
 const signup = async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return next(new HttpError('Invalid inputs passed, please check your data.', 422));
-  }
+  console.log("Request body:", req.body); // Log incoming data for debugging
 
-  const { name, email, password } = req.body; // Removed 'places'
+  const { name, email, firebaseUid } = req.body; // Ensure firebaseUid is destructured here
 
+  // Check for existing user
   let existingUser;
   try {
-    existingUser = await User.findOne({ email: email });
+    existingUser = await User.findOne({ email });
   } catch (err) {
-    const error = new HttpError('Signing up failed, please try again later.', 500);
-    return next(error);
+    console.error("Error checking existing user:", err);
+    return next(new HttpError("Signing up failed, please try again later.", 500));
   }
 
   if (existingUser) {
-    const error = new HttpError('User exists already, please login instead.', 422);
-    return next(error);
+    return next(new HttpError("User exists already, please login instead.", 422));
   }
 
+  // Create user
   const createdUser = new User({
     name,
     email,
-    image: 'https://live.staticflickr.com/7631/26849088292_36fc52ee90_b.jpg',
-    password,
-    events: [] // Initially empty array for events
+    firebaseUid, // Ensure firebaseUid is included here
+    image: "https://default.image.url",
+    events: [],
   });
+
+  console.log("Created user object:", createdUser); // Log the user object before saving
 
   try {
     await createdUser.save();
+    console.log("User successfully saved to database.");
   } catch (err) {
-    const error = new HttpError('Signing up failed, please try again.', 500);
-    return next(error);
+    console.error("Error saving user to database:", err);
+    return next(new HttpError("Signing up failed, please try again later.", 500));
   }
 
   res.status(201).json({ user: createdUser.toObject({ getters: true }) });
 };
+
+
 
 // User login
 const login = async (req, res, next) => {
@@ -152,13 +155,66 @@ const getUserEvents = async (req, res, next) => {
   }
 
   if (!userWithEvents || userWithEvents.events.length === 0) {
-    return next(new HttpError('Could not find events for the provided user id.', 404));
+    return res.json({ message: 'No events found for this user.' });
   }
 
   res.json({ events: userWithEvents.events.map(event => event.toObject({ getters: true })) });
 };
 
+// Fetch MongoDB user by Firebase UID
+const getUserByFirebaseUid = async (req, res, next) => {
+  const { firebaseUid } = req.params;
 
+  let user;
+  try {
+    user = await User.findOne({ firebaseUid });
+  } catch (err) {
+    const error = new HttpError('Fetching user failed, please try again later.', 500);
+    return next(error);
+  }
+
+  if (!user) {
+    const error = new HttpError('User not found.', 404);
+    return next(error);
+  }
+
+  res.json({ user: user.toObject({ getters: true }) });
+};
+
+const getFriends = async (req, res, next) => {
+  const userId = req.params.userId;
+
+  let userWithFriends;
+  try {
+    userWithFriends = await User.findById(userId).populate('friends');
+  } catch (err) {
+    const error = new HttpError('Fetching friends failed, please try again later.', 500);
+    return next(error);
+  }
+
+  res.json({
+    friends: userWithFriends?.friends?.map(friend => friend.toObject({ getters: true })) || [],
+  });
+};
+
+const getFriendRequests = async (req, res, next) => {
+  const userId = req.params.userId;
+
+  let userWithRequests;
+  try {
+    userWithRequests = await User.findById(userId).populate('friendRequestsReceived');
+  } catch (err) {
+    const error = new HttpError('Fetching friend requests failed, please try again later.', 500);
+    return next(error);
+  }
+
+  res.json({
+    friendRequests: userWithRequests?.friendRequestsReceived?.map(request => request.toObject({ getters: true })) || [],
+  });
+};
+exports.getFriends = getFriends;
+exports.getFriendRequests =getFriendRequests;
+exports.getUserByFirebaseUid = getUserByFirebaseUid;
 exports.editUser = editUser;
 exports.getUserById = getUserById;
 exports.getUsers = getUsers;

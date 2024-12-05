@@ -12,6 +12,14 @@ router.get('/:userId', usersController.getUserById);
 
 router.get('/', usersController.getUsers);
 
+router.get('/getByFirebaseUid/:firebaseUid', usersController.getUserByFirebaseUid);
+
+router.get('/events/:userId', usersController.getUserEvents); // Fetch user events
+
+router.get('/:userId/friends', usersController.getFriends); // Fetch user friends
+
+router.get('/:userId/friend-requests', usersController.getFriendRequests); // Fetch friend requests
+
 
 router.post(
   '/signup',
@@ -21,8 +29,7 @@ router.post(
       .isEmpty(),
     check('email')
       .normalizeEmail()
-      .isEmail(),
-    check('password').isLength({ min: 6 })
+      .isEmail()
   ],
   usersController.signup
 );

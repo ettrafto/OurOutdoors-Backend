@@ -49,6 +49,8 @@ const createEvent = async (req, res, next) => {
 
   const { sportId, userId, title, description, skill, datetime, location, participants, comments, likes } = req.body;
 
+  console.log("Request body:", req.body); // Debug the incoming request
+
   // Convert participants and likes from strings to ObjectIds
   const participantsIds = participants.map(id => new mongoose.Types.ObjectId(id));
   const likesIds = likes.map(id => new mongoose.Types.ObjectId(id));
