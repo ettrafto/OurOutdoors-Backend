@@ -1,5 +1,7 @@
 const uuid = require('uuid/v4');
 const { validationResult } = require('express-validator');
+const { addNotification } = require('./notification-controllers');
+
 
 const HttpError = require('../models/http-error');
 const User = require('../models/user');
@@ -158,6 +160,170 @@ const getUserEvents = async (req, res, next) => {
   res.json({ events: userWithEvents.events.map(event => event.toObject({ getters: true })) });
 };
 
+const sendFriendRequest = async (req, res, next) => {
+  const { senderId, recipientId } = req.body;
+
+  let sender, recipient;
+  //console.log('Sender ID:', senderId);
+  //console.log('Recipient ID:', recipientId);
+  try {
+    sender = await User.findById(senderId);
+    recipient = await User.findById(recipientId);
+  } catch (err) {
+    const error = new HttpError('Fetching users failed, please try again later.', 500);
+    return next(error);
+  }
+
+  if (!sender || !recipient) {
+    const error = new HttpError('Could not find the users for the provided ids.', 404);
+    return next(error);
+  }
+
+  // Check if the request has already been sent or they are already friends
+  if (recipient.friendRequestsReceived.includes(senderId) || sender.friends.includes(recipientId)) {
+    const error = new HttpError('Friend request already sent or already friends.', 422);
+    return next(error);
+  }
+
+  // Add the friend request
+  sender.friendRequestsSent.push(recipientId);
+  recipient.friendRequestsReceived.push(senderId);
+
+  try {
+    await sender.save();
+    await recipient.save();
+  } catch (err) {
+    const error = new HttpError('Sending friend request failed, please try again.', 500);
+    return next(error);
+  }
+
+  //creating a notification 
+  try {
+    const message = `You have a new friend request from ${req.user.username}`;
+    await addNotification(targetUserId, message, `/users/${userId}`);
+  } catch (err) {
+    return next(new HttpError('Failed to send notification.', 500));
+  }
+
+  res.status(200).json({ message: 'Friend request sent!' });
+};
+
+const acceptFriendRequest = async (req, res, next) => {
+  const { userId, senderId } = req.body;
+
+  let user, sender;
+  try {
+    user = await User.findById(userId);
+    sender = await User.findById(senderId);
+  } catch (err) {
+    const error = new HttpError('Fetching users failed, please try again later.', 500);
+    return next(error);
+  }
+
+  if (!user || !sender) {
+    const error = new HttpError('Could not find the users for the provided ids.', 404);
+    return next(error);
+  }
+
+  // Check if the friend request exists
+  if (!user.friendRequestsReceived.includes(senderId)) {
+    const error = new HttpError('No friend request from this user.', 404);
+    return next(error);
+  }
+
+  // Remove the friend request
+  user.friendRequestsReceived = user.friendRequestsReceived.filter(id => id.toString() !== senderId.toString());
+  sender.friendRequestsSent = sender.friendRequestsSent.filter(id => id.toString() !== userId.toString());
+
+  // Add to friends list
+  user.friends.push(senderId);
+  sender.friends.push(userId);
+
+  try {
+    await user.save();
+    await sender.save();
+  } catch (err) {
+    const error = new HttpError('Accepting friend request failed, please try again.', 500);
+    return next(error);
+  }
+
+  res.status(200).json({ message: 'Friend request accepted!' });
+};
+
+const rejectFriendRequest = async (req, res, next) => {
+  const { userId, senderId } = req.body;
+
+  let user, sender;
+  try {
+    user = await User.findById(userId);
+    sender = await User.findById(senderId);
+  } catch (err) {
+    const error = new HttpError('Fetching users failed, please try again later.', 500);
+    return next(error);
+  }
+
+  if (!user || !sender) {
+    const error = new HttpError('Could not find the users for the provided ids.', 404);
+    return next(error);
+  }
+
+  // Remove the friend request
+  user.friendRequestsReceived = user.friendRequestsReceived.filter(id => id.toString() !== senderId.toString());
+  sender.friendRequestsSent = sender.friendRequestsSent.filter(id => id.toString() !== userId.toString());
+
+  try {
+    await user.save();
+    await sender.save();
+  } catch (err) {
+    const error = new HttpError('Rejecting friend request failed, please try again.', 500);
+    return next(error);
+  }
+
+  res.status(200).json({ message: 'Friend request rejected!' });
+};
+
+const getFriends = async (req, res, next) => {
+  const userId = req.params.userId;
+
+  let userWithFriends;
+  try {
+    // Fetch the user and populate the 'friends' array
+    userWithFriends = await User.findById(userId).populate('friends');
+  } catch (err) {
+    const error = new HttpError('Fetching friends failed, please try again later.', 500);
+    return next(error);
+  }
+
+  /*if (!userWithFriends || userWithFriends.friends.length === 0) {
+    return next(new HttpError('Could not find friends for the provided user id.', 404));
+  }*/
+
+  res.json({
+    friends: userWithFriends.friends.map(friend => friend.toObject({ getters: true })),
+  });
+};
+
+const getFriendRequests = async (req, res, next) => {
+  const userId = req.params.userId;
+
+  let userWithRequests;
+  try {
+    // Fetch the user and populate the 'friendRequestsReceived' array
+    userWithRequests = await User.findById(userId).populate('friendRequestsReceived');
+  } catch (err) {6
+    const error = new HttpError('Fetching friend requests failed, please try again later.', 500);
+    return next(error);
+  }
+
+  /*if (!userWithRequests || userWithRequests.friendRequestsReceived.length === 0) {
+    return next(new HttpError('No friend requests found for the provided user id.', 404));
+  }*/
+
+  res.json({
+    friendRequests: userWithRequests.friendRequestsReceived.map(request => request.toObject({ getters: true }))
+  });
+};
+
 
 exports.editUser = editUser;
 exports.getUserById = getUserById;
@@ -165,3 +331,8 @@ exports.getUsers = getUsers;
 exports.signup = signup;
 exports.login = login;
 exports.getUserEvents = getUserEvents;
+exports.sendFriendRequest = sendFriendRequest;
+exports.acceptFriendRequest = acceptFriendRequest;
+exports.rejectFriendRequest = rejectFriendRequest;
+exports.getFriends = getFriends;
+exports.getFriendRequests = getFriendRequests;

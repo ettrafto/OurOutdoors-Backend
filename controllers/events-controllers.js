@@ -300,6 +300,8 @@ const toggleLikeEvent = async (req, res, next) => {
   } catch (err) {
     return next(new HttpError('Updating likes failed, please try again.', 500));
   }
+
+  
 };
 
 

@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const eventsRoutes = require('./routes/events-routes');
 const usersRoutes = require('./routes/users-routes');
 const sportsRoutes = require('./routes/sports-routes');
+const notificationRoutes = require('./routes/notification-routes')
 const HttpError = require('./models/http-error');
 
 const app = express();
@@ -18,6 +19,7 @@ app.use(bodyParser.json());
 app.use('/api/events', eventsRoutes); 
 app.use('/api/users', usersRoutes);
 app.use('/api/sports', sportsRoutes);
+app.use('/api/notifications', notificationRoutes)
 
 
 app.use((req, res, next) => {

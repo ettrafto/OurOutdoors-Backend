@@ -40,6 +40,14 @@ router.patch(
   ],
   usersController.editUser
 );
+router.post('/send-friend-request', usersController.sendFriendRequest);
 
+router.patch('/accept-friend-request', usersController.acceptFriendRequest);
+
+router.patch('/reject-friend-request', usersController.rejectFriendRequest);
+
+router.get('/:userId/friends', usersController.getFriends);
+
+router.get('/:userId/friend-requests', usersController.getFriendRequests);
 
 module.exports = router;

@@ -1,0 +1,1 @@
+MONGO_CONNECT = 'mongodb+srv://ettrafto:pleasehelp@cluster0.juykqy2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
