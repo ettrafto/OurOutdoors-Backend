@@ -39,23 +39,22 @@ const getFeed = async (req, res, next) => {
   res.json({ events: events.map(event => event.toObject({ getters: true })) });
 };
 
-// Create a new event and link it to the user
 const createEvent = async (req, res, next) => {
-  
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-      return next(new HttpError('Invalid inputs passed, please check your data.', 422));
+    console.error("Validation Errors:", errors);
+    return next(new HttpError('Invalid inputs passed, please check your data.', 422));
   }
 
   const { sportId, userId, title, description, skill, datetime, location, participants, comments, likes } = req.body;
 
-  console.log("Request body:", req.body); // Debug the incoming request
+  console.log("Request body received:", req.body);
 
-  // Convert participants and likes from strings to ObjectIds
-  const participantsIds = participants.map(id => new mongoose.Types.ObjectId(id));
-  const likesIds = likes.map(id => new mongoose.Types.ObjectId(id));
+  try {
+    const participantsIds = participants.map(id => new mongoose.Types.ObjectId(id));
+    const likesIds = likes.map(id => new mongoose.Types.ObjectId(id));
 
-  const createdEvent = new Event({
+    const createdEvent = new Event({
       sportId,
       userId,
       title,
@@ -65,35 +64,42 @@ const createEvent = async (req, res, next) => {
       location,
       participants: participantsIds,
       comments,
-      likes: likesIds
-  });
+      likes: likesIds,
+    });
 
-  let user;
-  try {
-    user = await User.findById(userId);
+    console.log("Created Event:", createdEvent);
+
+    let user;
+    try {
+      user = await User.findById(userId);
+      console.log("User found:", user);
+    } catch (err) {
+      console.error("Error finding user:", err);
+      return next(new HttpError('Finding user failed, please try again.', 500));
+    }
+
+    if (!user) {
+      console.error("User not found for ID:", userId);
+      return next(new HttpError('Could not find user for provided id.', 404));
+    }
+
+    try {
+      const sess = await mongoose.startSession();
+      sess.startTransaction();
+      await createdEvent.save({ session: sess });
+      user.events.push(createdEvent);
+      await user.save({ session: sess });
+      await sess.commitTransaction();
+    } catch (err) {
+      console.error("Transaction Error:", err);
+      return next(new HttpError('Creating event failed, please try again.', 500));
+    }
+
+    res.status(201).json({ event: createdEvent });
   } catch (err) {
-    const error = new HttpError('Finding user failed, please try again.', 500);
-    return next(error);
+    console.error("Unexpected Error:", err);
+    return next(new HttpError('Creating event failed, please try again.', 500));
   }
-
-  if (!user) {
-    const error = new HttpError('Could not find user for provided id.', 404);
-    return next(error);
-  }
-
-  try {
-    const sess = await mongoose.startSession();
-    sess.startTransaction();
-    await createdEvent.save({ session: sess });
-    user.events.push(createdEvent);
-    await user.save({ session: sess });
-    await sess.commitTransaction();
-  } catch (err) {
-    const error = new HttpError('Creating event failed, please try again.', 500);
-    return next(error);
-  }
-
-  res.status(201).json({ event: createdEvent });
 };
 
 // Update an existing event

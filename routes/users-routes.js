@@ -48,5 +48,14 @@ router.patch(
   usersController.editUser
 );
 
+router.get('/friends/:userId', usersController.getFriendEvents);
+
+router.post('/add-friend', usersController.addFriendByEmail);
+
+router.patch('/accept-friend-request', usersController.acceptFriendRequest);
+
+router.patch('/reject-friend-request', usersController.rejectFriendRequest);
+
+
 
 module.exports = router;

@@ -11,8 +11,9 @@ const getEventsBySportId = async (req, res, next) => {
     return next(new HttpError('Fetching events failed, please try again later.', 500));
   }
 
+  // Respond with an empty array if no events are found
   if (!events || events.length === 0) {
-    return next(new HttpError('Could not find events for the provided sport ID.', 404));
+    return res.status(200).json({ events: [] });
   }
 
   res.json({ events: events.map(event => event.toObject({ getters: true })) });
